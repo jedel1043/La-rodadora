@@ -1,0 +1,76 @@
+<Chat>
+    MDBoxLayout:
+        height: root.height
+        width: root.width
+        orientation: "vertical"
+        md_bg_color: 0,0.5,0.3,1
+
+
+        MDTopAppBar:
+            left_action_items: [["menu"]]
+            right_action_items: [["volume-mute"]]
+            elevation: 1
+
+        MDRelativeLayout:
+            Image:
+                source: "assets/background.webp"
+                fit_mode: "cover"
+
+            MDBoxLayout:
+                orientation: "horizontal"
+                padding: 30, 30
+
+                MDRelativeLayout:
+                    size_hint: 0.4, 1
+
+                    Image:
+                        source: "assets/raccoon/character-art/raccoon.png"
+                        size_hint: None, None
+                        size: self.parent.width, self.parent.width/self.image_ratio
+
+                PBoxLayout:
+                    orientation: "vertical"
+                    spacing: dp(2)
+
+                    RecycleView:
+                        id: chat_rv
+                        data: root.messages
+                        viewclass: "ChatBubble"
+
+                        canvas.before:
+                            Color:
+                                rgba: 1, 1, 1, 1
+                            RoundedRectangle:
+                                size: self.size
+                                pos: self.pos
+                                radius: [dp(8), ]
+
+                        RecycleBoxLayout:
+                            id: chat_box
+                            padding: dp(10)
+                            spacing: dp(15)
+                            orientation: "vertical"
+                            size_hint_y: None
+                            height: self.minimum_size[1]
+                            default_size_hint: .8, None
+                            default_size: None, None
+
+                    MDBoxLayout
+                        spacing: 10
+                        size_hint_y: None
+                        MDTextField:
+                            id: input
+                            multiline: True
+                            max_height: dp(75)
+                            hint_text: "Escribe una pregunta..."
+                            fill_color_normal: 0.8, 0.8, 0.8, 1
+                            text_color_normal: self.foreground_color
+                            text_color_focus: self.foreground_color
+                            mode: "fill"
+                            radius: [10, 10, 10, 10]
+
+                        MDIconButton:
+                            on_release: root.send(input.text.strip())
+                            icon: "send"
+                            md_bg_color: app.theme_cls.primary_color
+                            icon_color: app.theme_cls.accent_light

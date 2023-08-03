@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "rodadora-chatbot"
+version = "0.1.0"
+description = ""
+authors = ["jedel1043 <jedel0124@gmail.com>"]
+readme = "README.md"
+packages = [{include = "rodadora_chatbot"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+kivy = "^2.2.1"
+kivymd = "^1.1.1"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
