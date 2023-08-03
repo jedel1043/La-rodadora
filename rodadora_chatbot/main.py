@@ -10,6 +10,7 @@ from kivymd.uix.card import MDCard
 from kivymd.uix.widget import MDWidget
 
 import components
+from chatbot.main import chatbot
 
 class Chat(MDWidget):
     messages = ListProperty([])
@@ -31,8 +32,9 @@ class Chat(MDWidget):
         self.receive(text=text)
 
     def receive(self, text):
+        response = chatbot(text)
         self.messages.append(
-            {"text": text, "sent": False}
+            {"text": response, "sent": False}
         )
 
 
