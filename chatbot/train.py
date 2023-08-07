@@ -56,4 +56,5 @@ def train():
     model.fit(np.array(train_x), np.array(train_y), epochs=100, batch_size=8, verbose=1)
     model.save('chatbot/chat.h5')
 
-train()
+if __name__ == "__main__":
+    train()

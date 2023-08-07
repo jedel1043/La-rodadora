@@ -13,7 +13,7 @@
 
         MDRelativeLayout:
             Image:
-                source: "assets/background.webp"
+                source: "assets/background.png"
                 fit_mode: "cover"
 
             MDBoxLayout:
@@ -58,19 +58,26 @@
                     MDBoxLayout
                         spacing: 10
                         size_hint_y: None
+
+                        MDIconButton:
+                            on_release: root.record_message()
+                            icon: "microphone-message"
+                            md_bg_color: app.theme_cls.accent_color
+                            icon_color: app.theme_cls.icon_color
+
                         MDTextField:
                             id: input
                             multiline: True
                             max_height: dp(75)
                             hint_text: "Escribe una pregunta..."
-                            fill_color_normal: 0.8, 0.8, 0.8, 1
-                            text_color_normal: self.foreground_color
-                            text_color_focus: self.foreground_color
+                            fill_color_normal: 1,1,1,1
+                            text_color_normal: app.theme_cls.text_color
+                            text_color_focus: app.theme_cls.text_color
                             mode: "fill"
                             radius: [10, 10, 10, 10]
 
                         MDIconButton:
                             on_release: root.send(input.text.strip())
                             icon: "send"
-                            md_bg_color: app.theme_cls.primary_color
-                            icon_color: app.theme_cls.accent_light
+                            md_bg_color: app.theme_cls.primary_dark
+                            icon_color: app.theme_cls.opposite_icon_color
