@@ -1,0 +1,10 @@
+Poetry
+kivymd
+kivy
+tensorflow
+keras
+numpy
+nltk
+pyttsx3
+speechrecognition
+pyaudio

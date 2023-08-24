@@ -1,26 +1,42 @@
-from kivy.graphics.svg import Svg
-from kivy.uix.relativelayout import RelativeLayout
-from kivy.properties import StringProperty, ListProperty
-from kivy.core.window import Window
-from kivy.animation import Animation
+import os
+import sys
+import time
+try:
+    from kivy.graphics.svg import Svg
+    from kivy.uix.relativelayout import RelativeLayout
+    from kivy.properties import StringProperty, ListProperty
+    from kivy.core.window import Window
+    from kivy.animation import Animation
 
-from kivy.lang import Builder
-from kivymd.app import MDApp
-from kivymd.uix.card import MDCard
-from kivymd.uix.widget import MDWidget
-import sounddevice as sd
-import speech_recognition as sr
-import components
-from queue import Queue
-from threading import Thread
-from chatbot import Chatbot
-import pyttsx3
+    from kivy.lang import Builder
+    from kivymd.app import MDApp
+    from kivymd.uix.card import MDCard
+    from kivymd.uix.widget import MDWidget
+    import sounddevice as sd
+    import speech_recognition as sr
+    import components
+    from queue import Queue
+    from threading import Thread
+    from chatbot import Chatbot
+    import pyttsx3
+except Exception as e:
+    print(f"Error al iniciar la IA: {e}\nInstalando las independencias.")
+    os.system("pip3 install -r requirements.txt")
+    print("Reiniciando en 3 segundos")
+    time.sleep(3)
+    os.execv(sys.executable, ['python', 'main.py'])
 
 
 chat_bot = Chatbot()
 
+retroalimentacion = False
+mode = 0
+question = ""
+responses = []
+
 class Chat(MDWidget):
     messages = ListProperty([])
+
 
     def __init__(self):
         super().__init__()
@@ -46,6 +62,27 @@ class Chat(MDWidget):
     def send(self, text):
         if not text:
             return
+        global mode, retroalimentacion, question, responses, key
+        if retroalimentacion:
+            print("retroalimentacion en curso, modo: ", mode)
+            if mode == 1:
+                question = text
+                mode += 1
+            elif mode == 2:
+                responses.append(text)
+                mode += 1
+            elif mode == 3:
+                if text.lower() == "ciita":
+                    self.receive("Clave correcta, realizando retroalimentación.")
+                    chat_bot.retroalimentacion(question, responses)
+                    self.receive("Retroalimentación lista, reiniciando a Ruby en 5 segundos.")
+                    time.sleep(5)
+                    os.execv(sys.executable, ['python', 'main.py'])
+                else:
+                    self.receive("Clave incorrecta, deshaciendo los cambios.")
+                mode = 0
+                retroalimentacion = False
+            print(text)
 
         self.messages.append({"text": text, "sent": True, "pos_hint": {"right": 1}})
 
@@ -59,7 +96,22 @@ class Chat(MDWidget):
         self.requests.put(text)
 
     def receive(self, text):
-        self.messages.append({"text": text, "sent": False})
+        if text == "Lo siento, no cuento con dicha informacion o no pude entender bien su pregunta. Intenta reformular tu pregunta o realizar una retroalimentacion.":
+            print("fallo encontrado, texto: ", text)
+            global retroalimentacion, mode, key
+            if not retroalimentacion:
+                print('retroalimentando')
+                retroalimentacion = True
+                if mode == 0:
+                    self.messages.append({"text": "Lo siento, no cuento con dicha informacion o no pude entender bien su pregunta. Por favor vuelve a enviar tu pregunta para realizar la retroalimentación", "sent": False})
+                    mode += 1
+            if retroalimentacion:
+                if mode == 2:
+                    self.messages.append({"text": "Por favor vuelve a enviar la respuesta para realizar la retroalimentación", "sent": False})
+                elif mode == 3:
+                    self.messages.append({"text": "Por favor digita la clave para realizarla.", "sent": False})
+        else:
+            self.messages.append({"text": text, "sent": False})
 
 
     def record_message(self):

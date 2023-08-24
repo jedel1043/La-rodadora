@@ -5,7 +5,6 @@ import unicodedata
 import numpy as np
 import nltk
 from nltk.stem import WordNetLemmatizer
-from transcriber import transcribe_speech, reproducir_audio
 from keras.models import load_model
 from train import train
 
@@ -60,12 +59,9 @@ class Chatbot:
             return_list.append({'intent': classes[r[0]], 'probability': str(r[1])})
         return return_list
 
-    def retroalimentacion(self, text: str):
+    def retroalimentacion(self, text: str, responses: list):
         intents = lector()
         datas = intents['intents']
-        responses = []
-        response = input("Por favor coloca la respuesta que deseas ante tu pregunta: ")
-        responses.append(response)
         dicts = {'tag': text, 'patterns': [text], 'responses': responses}
         datas.append(dicts)
         dicts = {"intents": datas, "error": intents['error']}
