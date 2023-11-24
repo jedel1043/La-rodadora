@@ -1,6 +1,7 @@
 from kivy.lang import Builder
 from kivy.properties import ColorProperty, StringProperty
 from kivy.uix.label import Label
+from kivymd.uix.label import MDLabel
 
 from components.adaptive_widget import AdaptiveWidget
 
@@ -15,5 +16,5 @@ Builder.load_string(
 )
 
 
-class PLabel(AdaptiveWidget, Label):
+class PLabel(AdaptiveWidget, MDLabel):
     text_color = ColorProperty(None)

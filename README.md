@@ -1,17 +1,20 @@
 Proyecto de chatbot para mueso La Rodadora.
 
-# Requisitos
+# Requisitos (Python)
 - Python 3+
-- Poetry
 - kivymd
 - kivy
 - tensorflow
 - keras
 - numpy
 - nltk
-- pyttsx3
+- TTS
 - speechrecognition
 - pyaudio
+
+# Requisitos del sistema
+- Poetry
+- CUDA (si se requiere aceleración de GPU)
 
 # Ejecución
 

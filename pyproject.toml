@@ -1,3 +1,12 @@
+[project]
+name = "rodadora-chatbot"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+
 [tool.poetry]
 name = "rodadora-chatbot"
 version = "0.1.0"
@@ -10,7 +19,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.9, <3.12"
+python = ">=3.10, <3.12"
 numpy = "^1.22"
 kivy = "^2.2.1"
 kivymd = "^1.1.1"
@@ -20,6 +29,15 @@ nltk = "^3.8.1"
 pyttsx3 = "^2.90"
 speechrecognition = "^3.10.0"
 pyaudio = "^0.2.13"
+trio = "^0.22.2"
+openai-whisper = "^20230918"
+soundfile = "^0.12.1"
+torch = ">=2.0.0, !=2.0.1, !=2.1.0"
+sounddevice = "^0.4.6"
+langdetect = "^1.0.9"
+
+[tool.poetry.dev-dependencies]
+black = "^23.9.1"
 
 [build-system]
 requires = ["poetry-core"]

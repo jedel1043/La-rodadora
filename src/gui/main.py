@@ -1,169 +1,178 @@
-import os
-import sys
-import time
-try:
-    from kivy.graphics.svg import Svg
-    from kivy.uix.relativelayout import RelativeLayout
-    from kivy.properties import StringProperty, ListProperty
-    from kivy.core.window import Window
-    from kivy.animation import Animation
+from kivy.graphics.svg import Svg
+from kivy.uix.relativelayout import RelativeLayout
+from kivy.properties import StringProperty, ListProperty
+from kivy.core.window import Window
+from kivy.animation import Animation
+from kivy.lang import Builder
+from kivy.app import async_runTouchApp
 
-    from kivy.lang import Builder
-    from kivymd.app import MDApp
-    from kivymd.uix.card import MDCard
-    from kivymd.uix.widget import MDWidget
-    from kivymd.uix.button import MDIconButton
-    import speech_recognition as sr
-    import components
-    from queue import Queue
-    from threading import Thread
-    from chatbot import Chatbot
-    import pyttsx3
-except Exception as e:
-    print(f"Error al iniciar la IA: {e}\nInstalando las independencias.")
-    os.system("pip3 install -r requirements.txt")
-    print("Reiniciando en 3 segundos")
-    time.sleep(3)
-    os.execv(sys.executable, ['python', 'main.py'])
+from kivymd.app import MDApp
+from kivymd.uix.card import MDCard
+from kivymd.uix.widget import MDWidget
+from kivymd.uix.button import MDIconButton
+import trio
+import torch
+from langdetect import detect
 
-
-chat_bot = Chatbot()
-
-retroalimentacion = False
-mode = 0
-question = ""
-responses = []
+import components
+from tasks import chatbot, record, tts
 
 class Chat(MDWidget):
-    volume = 1
-    mute = False
     messages = ListProperty([])
 
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        self.requests = Queue()
-        self.tts = pyttsx3.init()
-        self.tts.setProperty("rate", 150)
-        self.volume = self.tts.getProperty("volume")
+    def __init__(self, sender, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        def chatter():
+        self.mute: bool = False
+        self.sender: trio.MemorySendChannel = sender
 
-            while True:
-                item = self.requests.get()
-                if item is None:
-                    break
-
-                response = chat_bot.chat(item)
-                self.receive(response)
-
-        self.background_thread = Thread(target=chatter)
-        self.background_thread.start()
-
-    def __del__(self):
-        self.requests.put(None)
-        self.background_thread.join()
+    def send_event(self, typ, value):
+        while True:
+            try:
+                self.sender.send_nowait({"type": typ, "value": value})
+            except trio.WouldBlock:
+                pass
+            except e:
+                self.sender.close
+                raise e
+            else:
+                break
 
     def send(self, text):
         if not text:
             return
-        global mode, retroalimentacion, question, responses, key
-        if retroalimentacion:
-            print("retroalimentacion en curso, modo: ", mode)
-            if mode == 1:
-                question = text
-                mode += 1
-            elif mode == 2:
-                responses.append(text)
-                mode += 1
-            elif mode == 3:
-                if text.lower() == "ciita":
-                    self.receive("Clave correcta, realizando retroalimentación.")
-                    chat_bot.retroalimentacion(question, responses)
-                    self.receive("Retroalimentación lista, reiniciando a Ruby en 5 segundos.")
-                    time.sleep(5)
-                    os.execv(sys.executable, ['python', 'main.py'])
-                else:
-                    self.receive("Clave incorrecta, deshaciendo los cambios.")
-                mode = 0
-                retroalimentacion = False
-            print(text)
+
+        lang = detect(text)
+
+        self.send_event("request", {"text": text, "lang": lang})
 
         self.messages.append({"text": text, "sent": True, "pos_hint": {"right": 1}})
 
         # scroll to bottom
+        self.scroll_to_bottom()
+
+    def receive(self, value):
+        text = value["text"]
+        self.messages.append({"text": text, "sent": False})
+        self.scroll_to_bottom()
+
+    def scroll_to_bottom(self):
         rv = self.ids.chat_rv
         box = self.ids.chat_box
         if rv.height < box.height:
             Animation.cancel_all(rv, "scroll_y")
             Animation(scroll_y=0, t="out_quad", d=0.5).start(rv)
 
-        self.requests.put(text)
-
-    def receive(self, text):
-        if text == "Lo siento, no cuento con dicha informacion o no pude entender bien su pregunta. Intenta reformular tu pregunta o realizar una retroalimentacion.":
-            print("fallo encontrado, texto: ", text)
-            global retroalimentacion, mode, key
-            if not retroalimentacion:
-                print('retroalimentando')
-                retroalimentacion = True
-                if mode == 0:
-                    self.messages.append({"text": "Lo siento, no cuento con dicha informacion o no pude entender bien su pregunta. Por favor vuelve a enviar tu pregunta para realizar la retroalimentación", "sent": False})
-                    mode += 1
-            if retroalimentacion:
-                if mode == 2:
-                    self.messages.append({"text": "Por favor vuelve a enviar la respuesta para realizar la retroalimentación", "sent": False})
-                elif mode == 3:
-                    self.messages.append({"text": "Por favor digita la clave para realizarla.", "sent": False})
-        else:
-            self.messages.append({"text": text, "sent": False})
-
-
     def record_message(self):
-        def record_and_transcribe():
-            recognizer = sr.Recognizer()
-            microphone = sr.Microphone()
-            with microphone as source:
-                recognizer.adjust_for_ambient_noise(source, duration=0.5)
-            self.receive("Puedes hablar...")
-            with microphone as source:
-                audio = recognizer.listen(source, timeout=15)
-            try:
-                text = recognizer.recognize_google(audio, language="es")
-                response = chat_bot.chat(text)
-                self.receive(response)
-                self.tts.say(response)
-                self.tts.runAndWait()
-                self.receive("Espero que mi respuesta te sea de mucha ayuda")
-            except sr.RequestError as e:
-                self.receive(f"Error en la solicitud a la API de Google Speech Recognition: {e}")
-            except sr.UnknownValueError:
-                self.receive("Google Speech Recognition no pudo entender el audio")
-            except Exception as e:
-                self.receive(f"Error durante la grabación o transcripción: {str(e)}")
-        recording_thread = Thread(target=record_and_transcribe)
-        recording_thread.start()
+        self.send_event("record", None)
 
     def toggle_mute(self, button: MDIconButton):
         self.mute = not self.mute
         if self.mute:
+            button.icon = "volume-mute"
             button.text_color = MDApp.get_running_app().theme_cls.accent_color
         else:
+            button.icon = "volume-high"
             button.text_color = MDApp.get_running_app().theme_cls.icon_color
-        self.tts.setProperty("volume", int(self.mute) * self.volume)
+        print(f"volumen: {1 - int(self.mute)}")
+        self.send_event("set-volume", 1 - int(self.mute))
 
+    def show_recording_popup(self, show: bool):
+        card = self.ids.recording_popup
+        if show:
+            card.disabled = False
+            card.opacity = 0.0
+            anim = Animation(opacity=1, t="in_out_sine", duration=2.0) + Animation(
+                opacity=0.3, t="in_out_sine", duration=2.0
+            )
+            anim.repeat = True
+            anim.start(card)
+        else:
+            Animation.cancel_all(card, "opacity")
+            card.disabled = True
+            card.opacity = 0.0
 
 class ChatApp(MDApp):
-    def on_stop(self):
-        self.chat.__del__()
-
     def build(self):
-        self.title = "La Rodadora"
-        self.theme_cls.theme_style = "Light"
-        self.theme_cls.primary_palette = "LightBlue"
-        self.chat = Chat()
+        print("Building root widget")
+        self.chat = Chat(self.event_sender)
         return self.chat
 
+    async def app_func(self):
+        print("Starting app")
+        self.title = "La Rodadora"
+        self.theme_cls.theme_style = "Light"
+        self.theme_cls.primary_palette = "Cyan"
+        print(self.theme_cls)
+
+        async with trio.open_nursery() as nursery:
+            chatbot_sender, chatbot_receiver = trio.open_memory_channel(5)
+            tts_sender, tts_receiver = trio.open_memory_channel(5)
+            event_sender, event_receiver = trio.open_memory_channel(5)
+            self.event_sender = event_sender.clone()
+
+            async def run_wrapper():
+                await self.async_run(async_lib="trio")
+                print("Exiting...")
+                with self.event_sender:
+                    await self.event_sender.send({"type": "exit"})
+                await self.event_sender.aclose()
+
+            nursery.start_soon(run_wrapper)
+            nursery.start_soon(
+                self.handle_events,
+                chatbot_sender,
+                tts_sender,
+                self.event_sender,
+                event_receiver,
+            )
+            nursery.start_soon(
+                trio.to_thread.run_sync,
+                chatbot,
+                chatbot_receiver,
+                event_sender.clone(),
+            )
+            nursery.start_soon(
+                trio.to_thread.run_sync, tts, tts_receiver, event_sender.clone()
+            )
+
+    async def handle_events(
+        self, chatbot_sender, tts_sender, events_sender, events_receiver
+    ):
+        async with trio.open_nursery() as nursery, chatbot_sender, tts_sender, events_receiver:
+            async for event in events_receiver:
+                match event["type"]:
+                    case "request":
+                        nursery.start_soon(
+                            chatbot_sender.send, {"value": event["value"], "tts": False}
+                        )
+                    case "request-tts":
+                        nursery.start_soon(
+                            chatbot_sender.send, {"value": event["value"], "tts": True}
+                        )
+                    case "response":
+                        self.chat.receive(event["value"])
+                    case "response-tts":
+                        self.chat.receive(event["value"])
+                        nursery.start_soon(
+                            tts_sender.send, {"type": "say", "value": event["value"]}
+                        )
+                    case "set-volume":
+                        nursery.start_soon(tts_sender.send, event)
+                    case "record":
+                        nursery.start_soon(
+                            trio.to_thread.run_sync,
+                            record,
+                            events_sender.clone(),
+                        )
+                    case "started-recording":
+                        self.chat.show_recording_popup(True)
+                    case "stopped-recording":
+                        self.chat.show_recording_popup(False)
+                    case "exit":
+                        nursery.cancel_scope.cancel()
 
 if __name__ == "__main__":
     Window.size = (1000, 700)
-    ChatApp().run()
+
+    trio.run(ChatApp().app_func)

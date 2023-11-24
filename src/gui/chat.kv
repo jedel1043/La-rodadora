@@ -8,12 +8,12 @@
 
         MDTopAppBar:
             left_action_items: [["menu", lambda x: x, "", "", app.theme_cls.icon_color]]
-            right_action_items: [["volume-mute", lambda x: app.chat.toggle_mute(x), "Silenciar", "", app.theme_cls.icon_color]]
+            right_action_items: [["volume-high", lambda x: app.chat.toggle_mute(x), "Silenciar", "", app.theme_cls.icon_color]]
             elevation: 1
 
         MDRelativeLayout:
             Image:
-                source: "assets/background.png"
+                source: "assets/background.jpeg"
                 fit_mode: "cover"
 
             MDBoxLayout:
@@ -24,16 +24,16 @@
                     size_hint: 0.4, 1
 
                     Image:
-                        source: "assets/raccoon/character-art/run.gif"
+                        source: "assets/raccoon/character-art/mapache-default.gif"
                         size_hint: None, None
                         size: self.parent.width, self.parent.width/self.image_ratio
-                        anim_delay:0.08
+                        anim_delay:0.03333
                         mipmap: True
                         keep_data: True
 
                 PBoxLayout:
                     orientation: "vertical"
-                    spacing: dp(2)
+                    spacing: 25
 
                     RecycleView:
                         id: chat_rv
@@ -61,12 +61,28 @@
                     MDBoxLayout
                         spacing: 10
                         size_hint_y: None
+                        height: 50
 
-                        MDIconButton:
-                            on_release: root.record_message()
-                            icon: "microphone-message"
-                            md_bg_color: app.theme_cls.accent_color
-                            icon_color: app.theme_cls.icon_color
+                        MDRelativeLayout:
+                            size_hint: 0.1, 1
+                            MDIconButton:
+                                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                                on_release: root.record_message()
+                                icon: "microphone-message"
+                                md_bg_color: app.theme_cls.accent_color
+                                icon_color: app.theme_cls.icon_color
+                            MDCard
+                                id: recording_popup
+                                padding: 4
+                                md_bg_color: app.theme_cls.accent_color
+                                size_hint: None, None
+                                opacity: 0
+                                disabled: True
+                                size: "100dp", "30dp"
+                                pos_hint: {'center_x': .5, 'y': 1.1}
+                                _no_ripple_effect: True
+                                PLabel:
+                                    text: "Grabando..."
 
                         EnterTextField:
                             id: input
@@ -76,9 +92,14 @@
                                 root.send(self.text.strip())
                                 self.text = ''
                             hint_text: "Escribe una pregunta..."
-                            fill_color_normal: 1,1,1,1
+                            fill_color_normal: app.theme_cls.primary_light
+                            fill_color_focus: app.theme_cls.primary_light
                             text_color_normal: app.theme_cls.text_color
                             text_color_focus: app.theme_cls.text_color
+                            hint_text_color_normal: 0, 0, 0, 0.3
+                            hint_text_color_focus: app.theme_cls.primary_light
+                            line_anim: False
+                            active_line: False
                             mode: "fill"
                             radius: [10, 10, 10, 10]
 
@@ -87,5 +108,6 @@
                                 root.send(input.text.strip())
                                 input.text = ''
                             icon: "send"
-                            md_bg_color: app.theme_cls.primary_dark
-                            icon_color: app.theme_cls.opposite_icon_color
+                            md_bg_color: app.theme_cls.primary_light
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.text_color
