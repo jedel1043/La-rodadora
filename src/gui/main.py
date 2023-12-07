@@ -1,3 +1,5 @@
+import logging
+
 from kivy.graphics.svg import Svg
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.properties import StringProperty, ListProperty
@@ -11,8 +13,7 @@ from kivymd.uix.card import MDCard
 from kivymd.uix.widget import MDWidget
 from kivymd.uix.button import MDIconButton
 import trio
-import torch
-from langdetect import detect
+import langdetect
 
 import components
 from tasks import chatbot, record, tts
@@ -42,17 +43,16 @@ class Chat(MDWidget):
         if not text:
             return
 
-        lang = detect(text)
+        lang = langdetect.detect(text)
 
-        self.send_event("request", {"text": text, "lang": lang})
+        self.send_event("request", {"text": text, "lang": lang, "tts": False})
 
         self.messages.append({"text": text, "sent": True, "pos_hint": {"right": 1}})
 
         # scroll to bottom
         self.scroll_to_bottom()
 
-    def receive(self, value):
-        text = value["text"]
+    def receive(self, text):
         self.messages.append({"text": text, "sent": False})
         self.scroll_to_bottom()
 
@@ -74,7 +74,7 @@ class Chat(MDWidget):
         else:
             button.icon = "volume-high"
             button.text_color = MDApp.get_running_app().theme_cls.icon_color
-        print(f"volumen: {1 - int(self.mute)}")
+        logging.debug(f"volume: {1 - int(self.mute)}")
         self.send_event("set-volume", 1 - int(self.mute))
 
     def show_recording_popup(self, show: bool):
@@ -94,7 +94,7 @@ class Chat(MDWidget):
 
 class ChatApp(MDApp):
     def build(self):
-        print("Building root widget")
+        logging.info("Building root widget")
         self.chat = Chat(self.event_sender)
         return self.chat
 
@@ -103,7 +103,6 @@ class ChatApp(MDApp):
         self.title = "La Rodadora"
         self.theme_cls.theme_style = "Light"
         self.theme_cls.primary_palette = "Cyan"
-        print(self.theme_cls)
 
         async with trio.open_nursery() as nursery:
             chatbot_sender, chatbot_receiver = trio.open_memory_channel(5)
@@ -113,7 +112,7 @@ class ChatApp(MDApp):
 
             async def run_wrapper():
                 await self.async_run(async_lib="trio")
-                print("Exiting...")
+                logging.info("Exiting...")
                 with self.event_sender:
                     await self.event_sender.send({"type": "exit"})
                 await self.event_sender.aclose()
@@ -141,22 +140,19 @@ class ChatApp(MDApp):
     ):
         async with trio.open_nursery() as nursery, chatbot_sender, tts_sender, events_receiver:
             async for event in events_receiver:
+                logging.debug(f"Event received: event: {event}")
                 match event["type"]:
                     case "request":
                         nursery.start_soon(
-                            chatbot_sender.send, {"value": event["value"], "tts": False}
-                        )
-                    case "request-tts":
-                        nursery.start_soon(
-                            chatbot_sender.send, {"value": event["value"], "tts": True}
+                            chatbot_sender.send, event["value"]
                         )
                     case "response":
-                        self.chat.receive(event["value"])
-                    case "response-tts":
-                        self.chat.receive(event["value"])
-                        nursery.start_soon(
-                            tts_sender.send, {"type": "say", "value": event["value"]}
-                        )
+                        value = event["value"]
+                        self.chat.receive(value["text"])
+                        if value["tts"]:
+                            nursery.start_soon(
+                                tts_sender.send, {"type": "say", "value": value}
+                            )
                     case "set-volume":
                         nursery.start_soon(tts_sender.send, event)
                     case "record":

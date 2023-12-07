@@ -1,3 +1,4 @@
+import logging
 import random
 import json
 import pickle
@@ -13,6 +14,7 @@ from .train import train
 
 parent_dir = Path(__file__).parent
 
+
 class PredictionError(Exception):
     """Raised when the predictor could not find a suitable answer"""
 
@@ -24,6 +26,7 @@ class UnsupportedLang(Exception):
 
     pass
 
+
 def get_response(intents_list, intents_json):
     tag = intents_list[0]["intent"]
     list_of_intents = intents_json["intents"]
@@ -32,6 +35,7 @@ def get_response(intents_list, intents_json):
             result = random.choice(i["responses"])
             break
     return result
+
 
 class Chatbot:
     def __init__(self, language: str):
@@ -42,7 +46,7 @@ class Chatbot:
             self.lemmatizer = WordNetLemmatizer()
             self.retroalimentacion_status = False
             self.model = load_model(self.datapath / "chat.h5")
-            print(f"Chatbot for language `{language}` enabled.")
+            logging.debug(f"Chatbot enabled: language: {language}")
         except:
             raise UnsupportedLang
 
@@ -61,7 +65,6 @@ class Chatbot:
         return np.array(bag)
 
     def predict_class(self, sentence):
-        print(self.model)
         classes = pickle.load(open(self.datapath / "classes.pkl", "rb"))
         words = pickle.load(open(self.datapath / "words.pkl", "rb"))
         msg = "".join(
@@ -98,26 +101,24 @@ class Chatbot:
             return json.load(file)
 
     def chat(self, message: str):
-        try:
-            intents = self.lector()
-            ints = self.predict_class(message)
-            if ints:
-                return get_response(ints, intents)
-        except Exception as e:
-            raise PredictionError
+        intents = self.lector()
+        ints = self.predict_class(message)
+        if ints:
+            return get_response(ints, intents)
+        raise PredictionError
 
 
 class PolyglotChatbot:
     def __init__(self, langs: [str]):
         self.models: dict[str, Chatbot] = {}
         for lang in langs:
-            models[lang] = Chatbot(lang)
+            self.models[lang] = Chatbot(lang)
 
     def chat(self, message: str, lang: str):
         if lang not in self.models:
             raise UnsupportedLang
 
-        self.models[lang].chat(message)
+        return self.models[lang].chat(message)
 
     def retroalimentacion(self, text: str, responses: list, lang: str):
         if lang not in self.models:
