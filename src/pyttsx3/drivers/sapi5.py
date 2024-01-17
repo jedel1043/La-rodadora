@@ -5,10 +5,18 @@ import os
 import sys
 import weakref
 import ctypes
-from ctypes import WINFUNCTYPE, windll, c_int, WinError, c_wchar_p, wstring_at, create_unicode_buffer
+from ctypes import windll, c_int, WinError, create_unicode_buffer
 from ctypes.wintypes import LCID, LPWSTR, DWORD
 from ..voice import Voice
 from . import toUtf8, fromUtf8
+
+import comtypes.client
+try:
+    from comtypes.gen import SpeechLib
+except ImportError:
+    comtypes.client.CreateObject("SAPI.SpVoice")
+    comtypes.client.CreateObject("SAPI.SpFileStream")
+    from comtypes.gen import SpeechLib
 
 def winfunc(name, dll, result, *args):
     '''build and apply a ctypes prototype complete with parameter flags'''
@@ -35,14 +43,6 @@ def LCIDToLocaleName_errcheck(result: c_int, func, args) -> str:
 
 LCIDToLocaleName.errcheck = LCIDToLocaleName_errcheck
 
-from comtypes.client import GetEvents, CreateObject
-
-if not hasattr(sys, "frozen"):
-    from comtypes.client import GetModule
-    GetModule("Speech\\Common\\sapi.dll")
-
-from comtypes.gen import SpeechLib
-
 # common voices
 MSSAM = 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\MSSam'
 MSMARY = 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\MSMary'
@@ -60,12 +60,12 @@ def buildDriver(proxy):
 
 class SAPI5Driver(object):
     def __init__(self, proxy):
-        self._tts = CreateObject('SAPI.SPVoice')
+        self._tts = comtypes.client.CreateObject('SAPI.SPVoice')
         # all events
         self._tts.EventInterests = 33790
         self._event_sink = SAPI5DriverEventSink()
         self._event_sink.setDriver(weakref.proxy(self))
-        self._advise = GetEvents(self._tts, self._event_sink)
+        self._advise = comtypes.client.GetEvents(self._tts, self._event_sink)
         self._proxy = proxy
         self._looping = False
         self._speaking = False
@@ -92,7 +92,7 @@ class SAPI5Driver(object):
 
     def save_to_file(self, text, filename):
         cwd = os.getcwd()
-        stream = CreateObject('SAPI.SPFileStream')
+        stream = comtypes.client.CreateObject('SAPI.SPFileStream')
         stream.Open(filename, SpeechLib.SSFMCreateForWrite)
         temp_stream = self._tts.AudioOutputStream
         self._tts.AudioOutputStream = stream

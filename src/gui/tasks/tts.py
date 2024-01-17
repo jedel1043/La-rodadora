@@ -88,7 +88,6 @@ def tts(receiver: trio.MemoryReceiveChannel, sender: trio.MemorySendChannel):
                     lang = value["lang"]
                     text = value["text"]
                     logging.debug("Requested TTS: text: {text}, lang: {lang}")
-                    print(value)
                     if lang == "es":
                         tts.setProperty("voice", es.id)
                     elif lang == "en":
