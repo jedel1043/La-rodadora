@@ -5,6 +5,7 @@ import io
 import wave
 import os
 from tempfile import NamedTemporaryFile
+from langcodes import Language
 from ..voice import Voice
 from . import _espeak, toUtf8, fromUtf8
 
@@ -69,7 +70,7 @@ class EspeakDriver(object):
                     languages = []
                     while v.languages.contents:
                         lang = ctypes.string_at(v.languages)
-                        void_p = ctypes.cast(v.languages, ctypes.c_voidp).value + len(lang) + 1
+                        void_p: int = ctypes.cast(v.languages, ctypes.c_void_p).value + len(lang) + 1
                         v.languages = ctypes.cast(void_p, ctypes.POINTER(ctypes.c_char))
                         languages.append(fromUtf8(lang[1:]))
                     kwargs['languages'] = languages

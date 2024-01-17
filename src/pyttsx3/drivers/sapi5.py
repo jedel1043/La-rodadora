@@ -1,19 +1,47 @@
-import comtypes.client  # Importing comtypes.client will make the gen subpackage
-try:
-    from comtypes.gen import SpeechLib  # comtypes
-except ImportError:
-    # Generate the SpeechLib lib and any associated files
-    engine = comtypes.client.CreateObject("SAPI.SpVoice")
-    stream = comtypes.client.CreateObject("SAPI.SpFileStream")
-    from comtypes.gen import SpeechLib
-
 import pythoncom
 import time
 import math
 import os
+import sys
 import weakref
+import ctypes
+from ctypes import WINFUNCTYPE, windll, c_int, WinError, c_wchar_p, wstring_at, create_unicode_buffer
+from ctypes.wintypes import LCID, LPWSTR, DWORD
 from ..voice import Voice
 from . import toUtf8, fromUtf8
+
+def winfunc(name, dll, result, *args):
+    '''build and apply a ctypes prototype complete with parameter flags'''
+    atypes = []
+    aflags = []
+    for arg in args:
+        atypes.append(arg[1])
+        aflags.append((arg[2], arg[0]) + arg[3:])
+    prototype = ctypes.WINFUNCTYPE(result, *atypes, use_last_error=True)
+    return prototype((name, dll), tuple(aflags))
+
+LCIDToLocaleName = winfunc(
+    'LCIDToLocaleName', windll.kernel32, c_int,
+    ("Locale", LCID, 1),
+    ("lpName", LPWSTR, 1),
+    ("cchName", c_int, 1),
+    ("dwFlags", DWORD, 1),
+)
+
+def LCIDToLocaleName_errcheck(result: c_int, func, args) -> str:
+    if result == 0:
+        raise WinError(ctypes.get_last_error())
+    return args
+
+LCIDToLocaleName.errcheck = LCIDToLocaleName_errcheck
+
+from comtypes.client import GetEvents, CreateObject
+
+if not hasattr(sys, "frozen"):
+    from comtypes.client import GetModule
+    GetModule("Speech\\Common\\sapi.dll")
+
+from comtypes.gen import SpeechLib
 
 # common voices
 MSSAM = 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\MSSam'
@@ -32,12 +60,12 @@ def buildDriver(proxy):
 
 class SAPI5Driver(object):
     def __init__(self, proxy):
-        self._tts = comtypes.client.CreateObject('SAPI.SPVoice')
+        self._tts = CreateObject('SAPI.SPVoice')
         # all events
         self._tts.EventInterests = 33790
         self._event_sink = SAPI5DriverEventSink()
         self._event_sink.setDriver(weakref.proxy(self))
-        self._advise = comtypes.client.GetEvents(self._tts, self._event_sink)
+        self._advise = GetEvents(self._tts, self._event_sink)
         self._proxy = proxy
         self._looping = False
         self._speaking = False
@@ -64,7 +92,7 @@ class SAPI5Driver(object):
 
     def save_to_file(self, text, filename):
         cwd = os.getcwd()
-        stream = comtypes.client.CreateObject('SAPI.SPFileStream')
+        stream = CreateObject('SAPI.SPFileStream')
         stream.Open(filename, SpeechLib.SSFMCreateForWrite)
         temp_stream = self._tts.AudioOutputStream
         self._tts.AudioOutputStream = stream
@@ -74,7 +102,15 @@ class SAPI5Driver(object):
         os.chdir(cwd)
 
     def _toVoice(self, attr):
-        return Voice(attr.Id, attr.GetDescription())
+        language = int(attr.getAttribute("Language"), base=16)
+        buffer = create_unicode_buffer(85)
+        result = LCIDToLocaleName(language, buffer, 85, 0)
+        locale = ctypes.wstring_at(buffer, int(result) - 1)
+
+        gender: str = attr.getAttribute("Gender")
+        age: str = attr.getAttribute("Age")
+
+        return Voice(attr.Id, attr.GetDescription(), languages=[locale], gender=gender, age=age)
 
     def _tokenFromId(self, id_):
         tokens = self._tts.GetVoices()

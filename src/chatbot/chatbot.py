@@ -6,7 +6,7 @@ import unicodedata
 import numpy as np
 import nltk
 from nltk.stem import WordNetLemmatizer
-from keras.models import load_model
+from tensorflow.keras.models import load_model
 
 from pathlib import Path
 
@@ -85,7 +85,7 @@ class Chatbot:
         return return_list
 
     def retroalimentacion(self, text: str, responses: list):
-        intents = lector()
+        intents = self.lector()
         datas = intents["intents"]
         dicts = {"tag": text, "patterns": [text], "responses": responses}
         datas.append(dicts)

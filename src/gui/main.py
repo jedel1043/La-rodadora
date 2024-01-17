@@ -33,7 +33,7 @@ class Chat(MDWidget):
                 self.sender.send_nowait({"type": typ, "value": value})
             except trio.WouldBlock:
                 pass
-            except e:
+            except Exception as e:
                 self.sender.close
                 raise e
             else:

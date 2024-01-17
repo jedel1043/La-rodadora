@@ -1,14 +1,27 @@
+from typing import List
+
+
 class Voice(object):
-    def __init__(self, id, name=None, languages=[], gender=None, age=None):
+    def __init__(
+        self,
+        id: str,
+        name: str = "unknown",
+        languages: List[str] = [],
+        gender: str = "unknown",
+        age: str = "unknown",
+    ):
         self.id = id
-        self.name = name
-        self.languages = languages
-        self.gender = gender
-        self.age = age
+        self.name: str = name
+        self.languages: List[str] = languages
+        self.gender: str = gender
+        self.age: str = age
 
     def __str__(self):
-        return """<Voice id=%(id)s
+        return (
+            """<Voice id=%(id)s
           name=%(name)s
           languages=%(languages)s
           gender=%(gender)s
-          age=%(age)s>""" % self.__dict__
+          age=%(age)s>"""
+            % self.__dict__
+        )

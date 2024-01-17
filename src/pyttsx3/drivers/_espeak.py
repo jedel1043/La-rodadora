@@ -428,25 +428,3 @@ Info = cfunc('espeak_Info', dll, c_char_p,
              ('ptr', c_void_p, 1, 0))
 Info.__doc__ = '''Returns the version number string.
    The parameter is for future use, and should be set to NULL'''
-
-if __name__ == '__main__':
-    def synth_cb(wav, numsample, events):
-        print(numsample, end="")
-        i = 0
-        while True:
-            if events[i].type == EVENT_LIST_TERMINATED:
-                break
-            print (events[i].type, end="")
-            i += 1
-        print
-        return 0
-
-    samplerate = Initialize(output=AUDIO_OUTPUT_PLAYBACK)
-    SetSynthCallback(synth_cb)
-    s = 'This is a test, only a test. '
-    uid = c_uint(0)
-    #print 'pitch=',GetParameter(PITCH)
-    #SetParameter(PITCH, 50, 0)
-    print(Synth(s))
-    while IsPlaying():
-        time.sleep(0.1)

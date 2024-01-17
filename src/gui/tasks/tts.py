@@ -1,6 +1,9 @@
 from enum import Enum
 from collections.abc import Iterable, MutableMapping
 from dataclasses import dataclass
+from langcodes import Language
+from langcodes.tag_parser import LanguageTagError
+from typing import List, Tuple
 import trio
 import pyttsx3
 from pyttsx3.voice import Voice
@@ -9,72 +12,65 @@ from gui.tasks.utils import emit
 import logging
 
 
-class BaseLanguage(Enum):
-    SPANISH = 0
-    ENGLISH = 1
+@dataclass
+class TTSVoice:
+    language: Language
+    id: str
 
 
 @dataclass
 class MissingLanguageSupport(Exception):
-    """Raised when the tts doesn't support a required language"""
+    """Raised when the tts is missing support from the system for a required language"""
 
-    language: BaseLanguage
+    language: Language
+
 
 @dataclass
-class UnsupportedLanguage(Exception):
+class UnknownLanguage(Exception):
     """Raised when the tts doesn't support a requested language"""
 
     language: str
 
-@dataclass
-class Language:
-    base_language: BaseLanguage
-    language_id: str
-    priority: int
+
+ES_MX = Language.get("es-MX")
+EN_US = Language.get("en-US")
 
 
-supported_langs = [
-    # Mexican spanish
-    Language(BaseLanguage.SPANISH, "es-mx", 15),
-    # Latin american spanish
-    Language(BaseLanguage.SPANISH, "es-419", 10),
-    # American english
-    Language(BaseLanguage.ENGLISH, "en-us", 10),
-    # American english (New York)
-    Language(BaseLanguage.ENGLISH, "en-us-nyc", 9),
-    # European spanish
-    Language(BaseLanguage.SPANISH, "es", 5),
-    # British english
-    Language(BaseLanguage.ENGLISH, "en-gb", 5),
-    # Neutral english
-    Language(BaseLanguage.ENGLISH, "en", 5),
-]
+def find_voices(
+    available: Iterable[Voice], requested: List[Language]
+) -> dict[Language, TTSVoice]:
+    tts_voices = []
+    for v in available:
+        for lang in v.languages:
+            try:
+                candidate = TTSVoice(Language.get(lang), v.id)
+                tts_voices.append(candidate)
+            except LanguageTagError:
+                pass
 
+    result: dict[Language, Tuple[TTSVoice, int]] = {}
 
-def find_voices(available: Iterable[Voice]) -> dict[BaseLanguage, str]:
-    result: dict[BaseLanguage, (str, int)] = {}
+    for voice in tts_voices:
+        for req in requested:
+            distance = req.distance(req)
+            if distance <= 25 and distance < result.get(req, (None, 255))[1]:
+                result[req] = (voice, distance)
 
-    for voice in available:
-        for lang in supported_langs:
-            if (
-                lang.language_id in voice.languages
-                and lang.priority > result.get(lang.base_language, ("", -1))[1]
-            ):
-                result[lang.base_language] = (voice.id, lang.priority)
-
-    return dict((base, lang_id) for (base, (lang_id, _)) in result.items())
+    return dict((lang, voice) for (lang, (voice, _)) in result.items())
 
 
 def tts(receiver: trio.MemoryReceiveChannel, sender: trio.MemorySendChannel):
     tts = pyttsx3.init()
     tts.setProperty("rate", 150)
 
-    voices = find_voices(tts.getProperty("voices"))
+    voices = find_voices(
+        tts.getProperty("voices"), [Language.get("es-MX"), Language.get("en-US")]
+    )
 
-    if (es := voices.get(BaseLanguage.SPANISH)) is None:
-        raise MissingLanguageSupport(BaseLanguage.SPANISH)
-    if (en := voices.get(BaseLanguage.ENGLISH)) is None:
-        raise MissingLanguageSupport(BaseLanguage.ENGLISH)
+    if (es := voices.get(ES_MX)) is None:
+        raise MissingLanguageSupport(ES_MX)
+    if (en := voices.get(EN_US)) is None:
+        raise MissingLanguageSupport(EN_US)
 
     logging.info(f"Selected voice for ES: {es}")
     logging.info(f"Selected voice for EN: {en}")
@@ -84,19 +80,21 @@ def tts(receiver: trio.MemoryReceiveChannel, sender: trio.MemorySendChannel):
             request = trio.from_thread.run(receiver.receive)
             match request["type"]:
                 case "set-volume":
+                    pass
                     tts.setProperty("volume", min(max(request["value"], 1.0), 0.0))
                 case "say":
+                    pass
                     value = request["value"]
                     lang = value["lang"]
                     text = value["text"]
                     logging.debug("Requested TTS: text: {text}, lang: {lang}")
                     print(value)
                     if lang == "es":
-                        tts.setProperty('voice', es)
+                        tts.setProperty("voice", es.id)
                     elif lang == "en":
-                        tts.setProperty('voice', en)
+                        tts.setProperty("voice", en.id)
                     else:
-                        raise UnsupportedLanguage(lang)
+                        raise UnknownLanguage(lang)
                     tts.say(text)
                     tts.runAndWait()
         except trio.EndOfChannel:
