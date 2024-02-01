@@ -30,3 +30,9 @@ script `build.ps1` en la raíz del proyecto utilizando Powershell:
 poetry install
 poetry run python src/gui/main.py
 ```
+
+# Creación de paquete instalable
+
+```
+poetry run pyinstaller ./src/gui/main.py
+```
